@@ -1,0 +1,90 @@
+@import 'tailwindcss';
+
+@theme inline {
+  --font-serif: var(--font-fraunces), 'Georgia', serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: #090909;
+  --color-foreground: #e9e1d0;
+  --color-charcoal: #151515;
+  --color-gold: #b08a3c;
+  --color-gold-muted: #8a6d30;
+  --color-ivory: #e9e1d0;
+  --color-stone: #c9bea7;
+  --color-stone-dim: #7d7466;
+
+  --color-card: #151515;
+  --color-card-foreground: #e9e1d0;
+  --color-border: rgba(176, 138, 60, 0.18);
+  --color-muted: #151515;
+  --color-muted-foreground: #c9bea7;
+  --color-accent: #b08a3c;
+  --color-accent-foreground: #090909;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    background-color: var(--color-background);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background-color: var(--color-gold);
+    color: var(--color-background);
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: var(--font-serif);
+  }
+  .tracking-label {
+    letter-spacing: 0.28em;
+  }
+  .tracking-wide-2 {
+    letter-spacing: 0.14em;
+  }
+  .hairline {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      var(--color-gold),
+      rgba(176, 138, 60, 0)
+    );
+  }
+}
+
+/* Subtle fade / reveal animation */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  opacity: 0;
+}
+.reveal.is-visible {
+  animation: reveal-up 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal.is-visible {
+    opacity: 1;
+    animation: none;
+  }
+}
