@@ -1,6 +1,6 @@
 'use client'
 
-import {ChevronDownIcon, ChevronRightIcon} from '@sanity/icons'
+import {ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, ChevronRightIcon} from '@sanity/icons'
 import {Box, Button, Card, Flex} from '@sanity/ui'
 import {useCallback, useMemo, useState} from 'react'
 import {
@@ -12,15 +12,12 @@ import {
 
 /**
  * Gallery input that groups the existing `gallery[]` items by their
- * existing `category` field.
+ * existing `category` field, with Move up / Move down buttons.
  *
- * - It only changes how the array is DISPLAYED in the Studio.
- * - Nothing is moved, copied or restructured in the stored document.
- * - The upload / "Add item" controls and file drag-and-drop area are
- *   Sanity's own (rendered through `renderDefault`).
- * - Every image row is Sanity's own item UI, so the edit dialog
- *   (image, hotspot/crop, alt, caption, category), duplicate and delete
- *   keep working exactly as before.
+ * - Display only: nothing is copied or restructured in the stored document.
+ * - Upload / "Add item" controls and the file drop-zone are Sanity's own.
+ * - Every image row is Sanity's own item UI (edit dialog, hotspot, alt,
+ *   caption, category, duplicate, delete).
  */
 
 const UNCATEGORISED_KEY = '__uncategorised__'
@@ -116,6 +113,8 @@ export function GroupedGalleryInput(props: ArrayOfObjectsInputProps) {
     renderInput,
     renderItem,
     renderPreview,
+    onItemMove,
+    readOnly,
   } = props
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -127,22 +126,10 @@ export function GroupedGalleryInput(props: ArrayOfObjectsInputProps) {
   const options = useMemo(() => getCategoryOptions(schemaType), [schemaType])
   const groups = useMemo(() => buildGroups(members, options), [members, options])
 
-  // Same schema type, only the "empty list" message differs (inherited via prototype).
-//   const controlsSchemaType = useMemo(
-//     () =>
-//       Object.create(schemaType, {
-//         placeholder: {
-//           value: 'Use Upload to add photographs. They are listed by category below.',
-//           enumerable: true,
-//         },
-//       }) as typeof schemaType,
-//     [schemaType],
-//   )
-
   return (
     <Flex direction="column" gap={4}>
       {/* Sanity's own Add / Upload buttons and file drop-zone, with the flat list hidden */}
-            {renderDefault({...props, members: []})}
+      {renderDefault({...props, members: []})}
 
       {groups.map((group) => {
         // Never hide an item whose edit dialog is open.
@@ -171,19 +158,60 @@ export function GroupedGalleryInput(props: ArrayOfObjectsInputProps) {
             {isOpen && (
               <Box padding={2} paddingTop={0}>
                 <Flex direction="column" gap={1}>
-                  {group.members.map((member) => (
-                    <ArrayOfObjectsInputMember
-                      key={member.key}
-                      member={member}
-                      renderAnnotation={renderAnnotation}
-                      renderBlock={renderBlock}
-                      renderField={renderField}
-                      renderInlineBlock={renderInlineBlock}
-                      renderInput={renderInput}
-                      renderItem={renderItem}
-                      renderPreview={renderPreview}
-                    />
-                  ))}
+                  {group.members.map((member, position) => {
+                    const previous = group.members[position - 1]
+                    const next = group.members[position + 1]
+
+                    // Moving to a neighbour's array index swaps their order,
+                    // even when photos from other categories sit between them.
+                    const move = (target?: ArrayOfObjectsMember) => {
+                      if (member.kind !== 'item' || target?.kind !== 'item') return
+                      onItemMove({fromIndex: member.index, toIndex: target.index})
+                    }
+                    const canMove = member.kind === 'item' && !readOnly
+
+                    return (
+                      <Flex key={member.key} align="center" gap={1}>
+                        <Box flex={1} style={{minWidth: 0}}>
+                          <ArrayOfObjectsInputMember
+                            member={member}
+                            renderAnnotation={renderAnnotation}
+                            renderBlock={renderBlock}
+                            renderField={renderField}
+                            renderInlineBlock={renderInlineBlock}
+                            renderInput={renderInput}
+                            renderItem={renderItem}
+                            renderPreview={renderPreview}
+                          />
+                        </Box>
+
+                        {canMove && (
+                          <Flex direction="column" gap={1}>
+                            <Button
+                              mode="ghost"
+                              padding={2}
+                              fontSize={1}
+                              icon={ArrowUpIcon}
+                              title="Move up"
+                              aria-label="Move up"
+                              disabled={!previous}
+                              onClick={() => move(previous)}
+                            />
+                            <Button
+                              mode="ghost"
+                              padding={2}
+                              fontSize={1}
+                              icon={ArrowDownIcon}
+                              title="Move down"
+                              aria-label="Move down"
+                              disabled={!next}
+                              onClick={() => move(next)}
+                            />
+                          </Flex>
+                        )}
+                      </Flex>
+                    )
+                  })}
                 </Flex>
               </Box>
             )}
