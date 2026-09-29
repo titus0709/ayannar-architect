@@ -1,4 +1,5 @@
 import { defineType, defineField, defineArrayMember } from "sanity"
+import { GroupedGalleryInput } from "@/components/GroupedGalleryInput" // NEW
 
 export const project = defineType({
   name: "project",
@@ -125,6 +126,9 @@ export const project = defineType({
       description:
         "Upload project photographs here. Each image can be assigned to a category.",
 
+      components: { input: GroupedGalleryInput }, // NEW: grouped display only
+      options: { sortable: false }, // NEW: hides drag handles (reordering across groups is meaningless)
+
       of: [
         defineArrayMember({
           type: "image",
@@ -133,10 +137,6 @@ export const project = defineType({
           },
 
           fields: [
-            // -------------------------------------------------
-            // ALT TEXT
-            // -------------------------------------------------
-
             defineField({
               name: "alt",
               title: "Alt text",
@@ -146,10 +146,6 @@ export const project = defineType({
               validation: (rule) => rule.required(),
             }),
 
-            // -------------------------------------------------
-            // CAPTION
-            // -------------------------------------------------
-
             defineField({
               name: "caption",
               title: "Caption",
@@ -157,10 +153,6 @@ export const project = defineType({
               description:
                 "Optional caption displayed when the image is opened.",
             }),
-
-            // -------------------------------------------------
-            // CATEGORY DROPDOWN
-            // -------------------------------------------------
 
             defineField({
               name: "category",
@@ -174,58 +166,19 @@ export const project = defineType({
                 layout: "dropdown",
 
                 list: [
-                  {
-                    title: "General Photo",
-                    value: "General Photo",
-                  },
-                  {
-                    title: "Vigraham",
-                    value: "Vigraham",
-                  },
-                  {
-                    title: "Vaganam",
-                    value: "Vaganam",
-                  },
-                  {
-                    title: "Compound Wall",
-                    value: "Compound Wall",
-                  },
-                  {
-                    title: "Small Temples",
-                    value: "Small Temples",
-                  },
-                  {
-                    title: "Mandapam",
-                    value: "Mandapam",
-                  },
-                  {
-                    title: "Interior",
-                    value: "Interior",
-                  },
-                  {
-                    title: "Exterior",
-                    value: "Exterior",
-                  },
-                  {
-                    title: "Sculpture",
-                    value: "Sculpture",
-                  },
-                  {
-                    title: "Kodimaram",
-                    value: "Kodimaram",
-                  },
-                  {
-                    title: "Restoration",
-                    value: "Restoration",
-                  },
-                  {
-                    title: "Details",
-                    value: "Details",
-                  },
-                  {
-                    title: "Other",
-                    value: "Other",
-                  },
+                  { title: "General Photo", value: "General Photo" },
+                  { title: "Vigraham", value: "Vigraham" },
+                  { title: "Vaganam", value: "Vaganam" },
+                  { title: "Compound Wall", value: "Compound Wall" },
+                  { title: "Small Temples", value: "Small Temples" },
+                  { title: "Mandapam", value: "Mandapam" },
+                  { title: "Interior", value: "Interior" },
+                  { title: "Exterior", value: "Exterior" },
+                  { title: "Sculpture", value: "Sculpture" },
+                  { title: "Kodimaram", value: "Kodimaram" },
+                  { title: "Restoration", value: "Restoration" },
+                  { title: "Details", value: "Details" },
+                  { title: "Other", value: "Other" },
                 ],
               },
             }),

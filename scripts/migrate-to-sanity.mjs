@@ -1,7 +1,13 @@
+
 import fs from "fs"
 import path from "path"
+import crypto from "crypto"
 import dotenv from "dotenv"
 import { createClient } from "@sanity/client"
+
+// ============================================================
+// ENVIRONMENT
+// ============================================================
 
 dotenv.config({ path: ".env.local" })
 
@@ -9,9 +15,14 @@ dotenv.config({ path: ".env.local" })
 // SANITY CONFIG
 // ============================================================
 
-const PROJECT_ID = process.env.NEXT_PUBLIC_SANITY_PROJECT_ID
-const DATASET = process.env.NEXT_PUBLIC_SANITY_DATASET
-const WRITE_TOKEN = process.env.SANITY_API_WRITE_TOKEN
+const PROJECT_ID =
+  process.env.NEXT_PUBLIC_SANITY_PROJECT_ID
+
+const DATASET =
+  process.env.NEXT_PUBLIC_SANITY_DATASET
+
+const WRITE_TOKEN =
+  process.env.SANITY_API_WRITE_TOKEN
 
 if (!PROJECT_ID) {
   throw new Error(
@@ -44,10 +55,13 @@ const client = createClient({
 // CONTENT DIRECTORY
 // ============================================================
 
-const CONTENT_DIR = path.join(process.cwd(), "content")
+const CONTENT_DIR = path.join(
+  process.cwd(),
+  "content"
+)
 
 // ============================================================
-// ALLOWED IMAGE EXTENSIONS
+// IMAGE EXTENSIONS
 // ============================================================
 
 const IMAGE_EXTENSIONS = [
@@ -60,57 +74,117 @@ const IMAGE_EXTENSIONS = [
 ]
 
 // ============================================================
-// YOUR EXACT GALLERY CATEGORIES
+// CATEGORY MAP
 // ============================================================
 //
-// The LEFT side is the folder name.
-// The RIGHT side is what gets saved into Sanity.
+// LEFT  = folder name
+// RIGHT = category stored in Sanity
 //
-// Example:
-//
-// content/project-name/vigraham/
-//                    ↓
-// category = "Vigraham"
+// Rajagopuram and Compound Wall are intentionally
+// combined into ONE category.
 // ============================================================
 
 const CATEGORY_MAP = {
+  // ----------------------------------------------------------
+  // VIGRAHAM
+  // ----------------------------------------------------------
+
   "vigraham": "Vigraham",
 
+  // ----------------------------------------------------------
+  // VAGANAM
+  // ----------------------------------------------------------
+
   "vaganam": "Vaganam",
+
+  // ----------------------------------------------------------
+  // GENERAL PHOTO
+  // ----------------------------------------------------------
 
   "general-photo": "General Photo",
   "general_photo": "General Photo",
   "general photo": "General Photo",
 
+  // ----------------------------------------------------------
+  // SMALL TEMPLES
+  // ----------------------------------------------------------
+
   "small-temples": "Small Temples",
   "small_temples": "Small Temples",
   "small temples": "Small Temples",
 
+  // ----------------------------------------------------------
+  // MANDAPAM
+  // ----------------------------------------------------------
+
   "mandapam": "Mandapam",
 
-  "rajagopuram": "Rajagopuram",
+  // ----------------------------------------------------------
+  // RAJAGOPURAM + COMPOUND WALL
+  // ----------------------------------------------------------
 
-  "compound-wall": "Compound Wall",
-  "compound_wall": "Compound Wall",
-  "compound wall": "Compound Wall",
+  "rajagopuram":
+    "Rajagopuram & Compound Wall",
+
+  "compound-wall":
+    "Rajagopuram & Compound Wall",
+
+  "compound_wall":
+    "Rajagopuram & Compound Wall",
+
+  "compound wall":
+    "Rajagopuram & Compound Wall",
+
+  "rajagopuram-compound-wall":
+    "Rajagopuram & Compound Wall",
+
+  "rajagopuram_compound_wall":
+    "Rajagopuram & Compound Wall",
+
+  "rajagopuram compound wall":
+    "Rajagopuram & Compound Wall",
+
+  // ----------------------------------------------------------
+  // CEMENT WORKS
+  // ----------------------------------------------------------
 
   "cement-works": "Cement Works",
   "cement_works": "Cement Works",
   "cement works": "Cement Works",
 
+  // ----------------------------------------------------------
+  // KODIMARAM
+  // ----------------------------------------------------------
+
   "kodimaram": "Kodimaram",
+
+  // ----------------------------------------------------------
+  // AMMAN KOVIL
+  // ----------------------------------------------------------
+
+  "amman-kovil": "Amman Kovil",
+  "amman_kovil": "Amman Kovil",
+  "amman kovil": "Amman Kovil",
+
+  // ----------------------------------------------------------
+  // DEEPASTHAMBAM
+  // ----------------------------------------------------------
+
+  "deepasthambam": "Deepasthambam",
 }
 
 // ============================================================
-// FORMAT CATEGORY
+// CATEGORY NORMALIZER
 // ============================================================
 
 function getCategory(folderName) {
-  const normalized = folderName
-    .trim()
-    .toLowerCase()
+  const normalized =
+    folderName
+      .trim()
+      .toLowerCase()
 
-  const category = CATEGORY_MAP[normalized]
+  const category =
+    CATEGORY_MAP[normalized]
 
   if (!category) {
     throw new Error(
@@ -123,8 +197,11 @@ function getCategory(folderName) {
       `  mandapam\n` +
       `  rajagopuram\n` +
       `  compound-wall\n` +
+      `  rajagopuram-compound-wall\n` +
       `  cement-works\n` +
-      `  kodimaram`
+      `  kodimaram\n` +
+      `  amman-kovil\n` +
+      `  deepasthambam`
     )
   }
 
@@ -144,7 +221,7 @@ function slugify(value) {
 }
 
 // ============================================================
-// CHECK IMAGE
+// IMAGE CHECK
 // ============================================================
 
 function isImageFile(filename) {
@@ -154,11 +231,59 @@ function isImageFile(filename) {
 }
 
 // ============================================================
-// UPLOAD IMAGE WITH RETRIES
+// SHA-1 HASH
+// ============================================================
+//
+// This is the key part that prevents duplicate uploads.
+//
+// Two files with identical contents will have the same SHA-1.
+// We check Sanity for that SHA-1 before uploading.
 // ============================================================
 
-async function uploadImage(filePath) {
-  const filename = path.basename(filePath)
+function getFileHash(filePath) {
+  const fileBuffer =
+    fs.readFileSync(filePath)
+
+  return crypto
+    .createHash("sha1")
+    .update(fileBuffer)
+    .digest("hex")
+}
+
+// ============================================================
+// FIND EXISTING SANITY IMAGE ASSET
+// ============================================================
+
+async function findExistingAsset(
+  sha1
+) {
+  const asset =
+    await client.fetch(
+      `*[
+        _type == "sanity.imageAsset" &&
+        sha1 == $sha1
+      ][0]{
+        _id,
+        originalFilename,
+        sha1
+      }`,
+      {
+        sha1,
+      }
+    )
+
+  return asset || null
+}
+
+// ============================================================
+// UPLOAD IMAGE
+// ============================================================
+
+async function uploadImage(
+  filePath
+) {
+  const filename =
+    path.basename(filePath)
 
   const MAX_RETRIES = 4
 
@@ -169,16 +294,18 @@ async function uploadImage(filePath) {
   ) {
     try {
       console.log(
-        `      Uploading: ${filename} (attempt ${attempt}/${MAX_RETRIES})`
+        `      Uploading: ${filename} ` +
+        `(attempt ${attempt}/${MAX_RETRIES})`
       )
 
-      const asset = await client.assets.upload(
-        "image",
-        fs.createReadStream(filePath),
-        {
-          filename,
-        }
-      )
+      const asset =
+        await client.assets.upload(
+          "image",
+          fs.createReadStream(filePath),
+          {
+            filename,
+          }
+        )
 
       console.log(
         `      ✓ Uploaded: ${filename}`
@@ -192,11 +319,14 @@ async function uploadImage(filePath) {
         }`
       )
 
-      if (attempt === MAX_RETRIES) {
+      if (
+        attempt === MAX_RETRIES
+      ) {
         throw error
       }
 
-      const waitTime = attempt * 3000
+      const waitTime =
+        attempt * 3000
 
       console.log(
         `      Waiting ${
@@ -204,10 +334,72 @@ async function uploadImage(filePath) {
         }s before retry...`
       )
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, waitTime)
+      await new Promise(
+        (resolve) =>
+          setTimeout(
+            resolve,
+            waitTime
+          )
       )
     }
+  }
+}
+
+// ============================================================
+// GET OR CREATE ASSET
+// ============================================================
+//
+// 1. Calculate local file SHA-1
+// 2. Search Sanity for same SHA-1
+// 3. If found → reuse existing asset
+// 4. If not found → upload
+// ============================================================
+
+async function getOrCreateAsset(
+  filePath
+) {
+  const filename =
+    path.basename(filePath)
+
+  console.log(
+    `      Checking: ${filename}`
+  )
+
+  const sha1 =
+    getFileHash(filePath)
+
+  const existingAsset =
+    await findExistingAsset(
+      sha1
+    )
+
+  if (existingAsset) {
+    console.log(
+      `      ✓ Already exists in Sanity: ${filename}`
+    )
+
+    console.log(
+      `        Asset ID: ${existingAsset._id}`
+    )
+
+    return {
+      _id: existingAsset._id,
+      reused: true,
+    }
+  }
+
+  console.log(
+    `      + New image detected: ${filename}`
+  )
+
+  const asset =
+    await uploadImage(
+      filePath
+    )
+
+  return {
+    _id: asset._id,
+    reused: false,
   }
 }
 
@@ -223,16 +415,44 @@ function createAltText(
 }
 
 // ============================================================
+// NORMALIZE OLD CATEGORY VALUES
+// ============================================================
+//
+// This is useful if your existing Sanity project already has:
+//
+// "Rajagopuram"
+// "Compound Wall"
+//
+// They will automatically become:
+//
+// "Rajagopuram & Compound Wall"
+// ============================================================
+
+function normalizeExistingCategory(
+  category
+) {
+  if (
+    category === "Rajagopuram" ||
+    category === "Compound Wall"
+  ) {
+    return "Rajagopuram & Compound Wall"
+  }
+
+  return category
+}
+
+// ============================================================
 // MIGRATE ONE PROJECT
 // ============================================================
 
 async function migrateProject(
   projectFolderName
 ) {
-  const projectDir = path.join(
-    CONTENT_DIR,
-    projectFolderName
-  )
+  const projectDir =
+    path.join(
+      CONTENT_DIR,
+      projectFolderName
+    )
 
   console.log(
     "\n========================================"
@@ -246,20 +466,26 @@ async function migrateProject(
     "========================================"
   )
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // META.JSON
-  // ----------------------------------------------------------
+  // ==========================================================
 
-  const metaPath = path.join(
-    projectDir,
-    "meta.json"
-  )
+  const metaPath =
+    path.join(
+      projectDir,
+      "meta.json"
+    )
 
   let meta = {}
 
-  if (fs.existsSync(metaPath)) {
+  if (
+    fs.existsSync(metaPath)
+  ) {
     meta = JSON.parse(
-      fs.readFileSync(metaPath, "utf8")
+      fs.readFileSync(
+        metaPath,
+        "utf8"
+      )
     )
 
     console.log(
@@ -271,36 +497,47 @@ async function migrateProject(
     )
   }
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // PROJECT INFORMATION
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const title =
     meta.title ||
     projectFolderName
 
-  const slug = slugify(
-    projectFolderName
+  const slug =
+    slugify(
+      projectFolderName
+    )
+
+  console.log(
+    `✓ Project title: ${title}`
   )
 
-  console.log(`✓ Project title: ${title}`)
-  console.log(`✓ Project slug: ${slug}`)
+  console.log(
+    `✓ Project slug: ${slug}`
+  )
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // FIND CATEGORY FOLDERS
-  // ----------------------------------------------------------
+  // ==========================================================
 
-  const categoryFolders = fs
-    .readdirSync(projectDir, {
-      withFileTypes: true,
-    })
-    .filter(
-      (entry) =>
-        entry.isDirectory()
-    )
-    .map(
-      (entry) => entry.name
-    )
+  const categoryFolders =
+    fs
+      .readdirSync(
+        projectDir,
+        {
+          withFileTypes: true,
+        }
+      )
+      .filter(
+        (entry) =>
+          entry.isDirectory()
+      )
+      .map(
+        (entry) =>
+          entry.name
+      )
 
   if (
     categoryFolders.length === 0
@@ -316,91 +553,207 @@ async function migrateProject(
     `✓ Found ${categoryFolders.length} category folder(s)`
   )
 
-  // ----------------------------------------------------------
-  // GALLERY
-  // ----------------------------------------------------------
+  // ==========================================================
+  // FIND EXISTING PROJECT
+  // ==========================================================
+
+  const existingProject =
+    await client.fetch(
+      `*[
+        _type == "project" &&
+        slug.current == $slug
+      ][0]{
+        _id,
+        title,
+        heroImage,
+        gallery
+      }`,
+      {
+        slug,
+      }
+    )
+
+  // ==========================================================
+  // EXISTING GALLERY
+  // ==========================================================
 
   const gallery = []
 
-  let heroImage = null
-
-  // ----------------------------------------------------------
-  // PROCESS EACH CATEGORY
-  // ----------------------------------------------------------
-
-  for (
-    const categoryFolder of categoryFolders
+  if (
+    existingProject?.gallery &&
+    Array.isArray(
+      existingProject.gallery
+    )
   ) {
-    const categoryPath = path.join(
-      projectDir,
-      categoryFolder
+    console.log(
+      `✓ Existing gallery found: ${existingProject.gallery.length} image(s)`
     )
 
-    let categoryLabel
+    for (
+      const existingImage
+      of existingProject.gallery
+    ) {
+      gallery.push({
+        ...existingImage,
 
-    try {
-      categoryLabel =
-        getCategory(
-          categoryFolder
+        category:
+          normalizeExistingCategory(
+            existingImage.category
+          ),
+      })
+    }
+  } else {
+    console.log(
+      "✓ No existing gallery found"
+    )
+  }
+
+  // ==========================================================
+  // EXISTING ASSET IDS
+  // ==========================================================
+
+  const existingAssetIds =
+    new Set(
+      gallery
+        .map(
+          (image) =>
+            image?.asset?._ref
         )
-    } catch (error) {
-      console.log(
-        `\n❌ ${error.message}`
+        .filter(Boolean)
+    )
+
+  console.log(
+    `✓ Existing unique assets: ${existingAssetIds.size}`
+  )
+
+  // ==========================================================
+  // HERO IMAGE
+  // ==========================================================
+
+  let heroImage =
+    existingProject?.heroImage ||
+    null
+
+  if (heroImage) {
+    console.log(
+      "✓ Existing hero image preserved"
+    )
+  }
+
+  // ==========================================================
+  // PROCESS EACH CATEGORY
+  // ==========================================================
+
+  for (
+    const categoryFolder
+    of categoryFolders
+  ) {
+    const categoryPath =
+      path.join(
+        projectDir,
+        categoryFolder
       )
 
-      throw error
-    }
+    const categoryLabel =
+      getCategory(
+        categoryFolder
+      )
 
     console.log(
       `\n  Category: ${categoryLabel}`
     )
 
-    // --------------------------------------------------------
+    // ========================================================
     // FIND IMAGES
-    // --------------------------------------------------------
+    // ========================================================
 
-    const files = fs
-      .readdirSync(categoryPath)
-      .filter(isImageFile)
-      .sort()
+    const files =
+      fs
+        .readdirSync(
+          categoryPath
+        )
+        .filter(
+          isImageFile
+        )
+        .sort()
 
     console.log(
       `  ✓ Found ${files.length} image(s)`
     )
 
-    // --------------------------------------------------------
-    // UPLOAD EACH IMAGE
-    // --------------------------------------------------------
-
-    for (
-      const filename of files
+    if (
+      files.length === 0
     ) {
-      const filePath = path.join(
-        categoryPath,
-        filename
+      console.log(
+        "  ⚠ No images in this folder"
       )
 
+      continue
+    }
+
+    // ========================================================
+    // PROCESS EACH IMAGE
+    // ========================================================
+
+    for (
+      const filename
+      of files
+    ) {
+      const filePath =
+        path.join(
+          categoryPath,
+          filename
+        )
+
+      console.log(
+        `\n    Image: ${filename}`
+      )
+
+      // ======================================================
+      // GET OR CREATE ASSET
+      // ======================================================
+
       const asset =
-        await uploadImage(
+        await getOrCreateAsset(
           filePath
         )
 
-      // ------------------------------------------------------
-      // GALLERY IMAGE
-      // ------------------------------------------------------
+      const assetId =
+        asset._id
+
+      // ======================================================
+      // CHECK IF IMAGE ALREADY EXISTS
+      // ======================================================
+
+      if (
+        existingAssetIds.has(
+          assetId
+        )
+      ) {
+        console.log(
+          `      ✓ Already in this project's gallery - SKIPPED`
+        )
+
+        continue
+      }
+
+      // ======================================================
+      // CREATE GALLERY IMAGE
+      // ======================================================
 
       const imageItem = {
         _type: "image",
 
         asset: {
           _type: "reference",
-          _ref: asset._id,
+          _ref: assetId,
         },
 
-        alt: createAltText(
-          title,
-          categoryLabel
-        ),
+        alt:
+          createAltText(
+            title,
+            categoryLabel
+          ),
 
         caption: "",
 
@@ -412,13 +765,25 @@ async function migrateProject(
         imageItem
       )
 
-      console.log(
-        `      ✓ Category assigned: ${categoryLabel}`
+      existingAssetIds.add(
+        assetId
       )
 
-      // ------------------------------------------------------
-      // FIRST IMAGE = HERO
-      // ------------------------------------------------------
+      console.log(
+        `      ✓ Added to gallery`
+      )
+
+      console.log(
+        `      ✓ Category: ${categoryLabel}`
+      )
+
+      // ======================================================
+      // HERO IMAGE
+      // ======================================================
+      //
+      // Only create a hero if the project doesn't already
+      // have one.
+      //
 
       if (!heroImage) {
         heroImage = {
@@ -426,21 +791,22 @@ async function migrateProject(
 
           asset: {
             _type: "reference",
-            _ref: asset._id,
+            _ref: assetId,
           },
 
-          alt: `${title} - ${categoryLabel}`,
+          alt:
+            `${title} - ${categoryLabel}`,
         }
 
         console.log(
-          `      ★ First image selected as Hero Image`
+          `      ★ Selected as Hero Image`
         )
       }
     }
   }
 
   // ==========================================================
-  // VALIDATE IMAGES
+  // VALIDATE HERO
   // ==========================================================
 
   if (!heroImage) {
@@ -450,21 +816,8 @@ async function migrateProject(
   }
 
   // ==========================================================
-  // CHECK EXISTING PROJECT
+  // DOCUMENT ID
   // ==========================================================
-
-  const existingProject =
-    await client.fetch(
-      `*[
-        _type == "project" &&
-        slug.current == $slug
-      ][0]{
-        _id
-      }`,
-      {
-        slug,
-      }
-    )
 
   const documentId =
     existingProject?._id ||
@@ -475,7 +828,7 @@ async function migrateProject(
   )
 
   // ==========================================================
-  // CREATE SANITY DOCUMENT
+  // CREATE UPDATED DOCUMENT
   // ==========================================================
 
   const document = {
@@ -512,14 +865,18 @@ async function migrateProject(
     gallery,
 
     featured:
-      meta.featured ?? false,
+      meta.featured ??
+      existingProject?.featured ??
+      false,
 
     order:
-      meta.order ?? 0,
+      meta.order ??
+      existingProject?.order ??
+      0,
   }
 
   // ==========================================================
-  // SAVE PROJECT
+  // SAVE
   // ==========================================================
 
   console.log(
@@ -531,7 +888,7 @@ async function migrateProject(
   )
 
   // ==========================================================
-  // SUCCESS
+  // SUMMARY
   // ==========================================================
 
   console.log(
@@ -543,15 +900,19 @@ async function migrateProject(
   )
 
   console.log(
-    `  Categories: ${categoryFolders.length}`
+    `  Category folders: ${categoryFolders.length}`
   )
 
   console.log(
-    `  Gallery images: ${gallery.length}`
+    `  Total gallery images: ${gallery.length}`
   )
 
   console.log(
     `  Document ID: ${documentId}`
+  )
+
+  console.log(
+    "  Duplicate images: skipped"
   )
 }
 
@@ -560,9 +921,9 @@ async function migrateProject(
 // ============================================================
 
 async function main() {
-  // ----------------------------------------------------------
+  // ==========================================================
   // CHECK CONTENT DIRECTORY
-  // ----------------------------------------------------------
+  // ==========================================================
 
   if (
     !fs.existsSync(
@@ -574,9 +935,9 @@ async function main() {
     )
   }
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // FIND PROJECTS
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const projectFolders =
     fs
@@ -609,6 +970,10 @@ async function main() {
     `Found ${projectFolders.length} project(s).`
   )
 
+  // ==========================================================
+  // SUPPORTED CATEGORIES
+  // ==========================================================
+
   console.log(
     "\nCategories supported:"
   )
@@ -634,36 +999,41 @@ async function main() {
   )
 
   console.log(
-    "  6. Rajagopuram"
+    "  6. Rajagopuram & Compound Wall"
   )
 
   console.log(
-    "  7. Compound Wall"
+    "  7. Cement Works"
   )
 
   console.log(
-    "  8. Cement Works"
+    "  8. Kodimaram"
   )
 
   console.log(
-    "  9. Kodimaram"
+    "  9. Amman Kovil"
   )
 
-  // ----------------------------------------------------------
-  // MIGRATE PROJECTS ONE BY ONE
-  // ----------------------------------------------------------
+  console.log(
+    "  10. Deepasthambam"
+  )
+
+  // ==========================================================
+  // PROCESS PROJECTS
+  // ==========================================================
 
   for (
-    const projectFolder of projectFolders
+    const projectFolder
+    of projectFolders
   ) {
     await migrateProject(
       projectFolder
     )
   }
 
-  // ----------------------------------------------------------
-  // FINISHED
-  // ----------------------------------------------------------
+  // ==========================================================
+  // COMPLETE
+  // ==========================================================
 
   console.log(
     "\n========================================"
@@ -695,3 +1065,4 @@ main().catch(
     process.exit(1)
   }
 )
+
