@@ -1,5 +1,7 @@
 import { defineType, defineField, defineArrayMember } from "sanity"
-import { GroupedGalleryInput } from "@/components/GroupedGalleryInput" // NEW
+
+import { GALLERY_CATEGORY_OPTIONS } from "@/components/Gallerycategories"
+import { GroupedGalleryInput } from "@/components/GroupedGalleryInput"
 
 export const project = defineType({
   name: "project",
@@ -116,6 +118,9 @@ export const project = defineType({
 
     // =========================================================
     // GALLERY
+    // Same data as before (one `gallery` array, each image has a
+    // `category`). Only the Studio UI changes: one upload box with a
+    // category picker, photos shown under category titles, drag to reorder.
     // =========================================================
 
     defineField({
@@ -124,10 +129,9 @@ export const project = defineType({
       type: "array",
       group: "media",
       description:
-        "Upload project photographs here. Each image can be assigned to a category.",
+        "Pick a category, upload photos into it, and drag photos to reorder. Click a photo to edit its alt text, caption or category.",
 
-      components: { input: GroupedGalleryInput }, // NEW: grouped display only
-      options: { sortable: false }, // NEW: hides drag handles (reordering across groups is meaningless)
+      components: { input: GroupedGalleryInput },
 
       of: [
         defineArrayMember({
@@ -158,28 +162,11 @@ export const project = defineType({
               name: "category",
               title: "Category",
               type: "string",
-
               description:
                 "Choose which gallery category this photograph belongs to.",
-
               options: {
                 layout: "dropdown",
-
-                list: [
-                  { title: "General Photo", value: "General Photo" },
-                  { title: "Vigraham", value: "Vigraham" },
-                  { title: "Vaganam", value: "Vaganam" },
-                  { title: "Compound Wall", value: "Compound Wall" },
-                  { title: "Small Temples", value: "Small Temples" },
-                  { title: "Mandapam", value: "Mandapam" },
-                  { title: "Interior", value: "Interior" },
-                  { title: "Exterior", value: "Exterior" },
-                  { title: "Sculpture", value: "Sculpture" },
-                  { title: "Kodimaram", value: "Kodimaram" },
-                  { title: "Restoration", value: "Restoration" },
-                  { title: "Details", value: "Details" },
-                  { title: "Other", value: "Other" },
-                ],
+                list: GALLERY_CATEGORY_OPTIONS,
               },
             }),
           ],
